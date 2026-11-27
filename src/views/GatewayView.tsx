@@ -145,7 +145,7 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
           </form>}
         </Card>
       ) : (
-        <>
+        <div className="settings-stack">
           <GatewayDevices status={status} editor={deviceForm} setEditor={setDeviceForm} busy={busy}
             configDirty={configDirty} connectionsAvailable={connectionsAvailable}
             onMode={(device, mode) => void mutation(`devices/${encodeURIComponent(device.id)}`,
@@ -195,7 +195,7 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
               </>
             )}
           </Card>
-        </>
+        </div>
       )}
     </div>
   );
