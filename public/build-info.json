@@ -1,0 +1,5 @@
+{
+  "upstream": "SagerNet/sing-box-dashboard",
+  "upstreamRevision": "3e4bf08e5bf5b9417cf9c36e5a2d5abcb21bdd34",
+  "targetCoreVersion": "1.14.5"
+}

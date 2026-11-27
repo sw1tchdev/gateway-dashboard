@@ -1,14 +1,16 @@
-# sing-box dashboard
+# Home Gateway
 
-Web dashboard for sing-box.
+Home Gateway is an independent dashboard for a local sing-box gateway. It is based on [SagerNet/sing-box-dashboard](https://github.com/SagerNet/sing-box-dashboard) at commit `3e4bf08e5bf5b9417cf9c36e5a2d5abcb21bdd34`. The Gateway API integration targets sing-box 1.14.5.
 
-## Public instance
+Open **Gateway** to authenticate with the management service on the dashboard origin at `/api/gateway/`. The administrator credential stays in tab memory. The device card shows the confirmed route and links to the selected native server's tracked connections when it is on the same host. New game connections that bypass sing-box are outside this stream.
 
-http://sing-box-dashboard.sagernet.org
+To edit a configuration, load the editable sections, make changes, and validate them. Review the diff of server-masked values before applying and restarting. The server preserves masked credentials when their placeholders are left intact. Restart and restore actions are available on the Gateway page even if the native API is temporarily down. The management service and reverse proxy must be running.
 
-For Chrome, you can use HTTPS, but not for other browsers.
+## Build and release
 
-Shortcut: dash.sing-box.app
+Use Node 22 and the pnpm version pinned in `package.json`. Initialize Git submodules, then run `pnpm install --frozen-lockfile`, `pnpm generate`, `pnpm test` and `pnpm build`. Serve the contents of `dist/` below `/dashboard/`.
+
+A `gateway-v*` release tag runs the same checks and produces a zip with the contents of `dist/`, including `build-info.json` with source revisions and the target core version. The private gateway configuration, device inventory and administrator credential are supplied separately on the server. For upgrades, merge the new upstream commit into a topic branch and review a pull request in this fork. Update the recorded upstream revision and verify group selection, the connection filter, device routing and DNS before tagging a release. Keep the previous verified static release available when updating.
 
 ## LICENSE
 

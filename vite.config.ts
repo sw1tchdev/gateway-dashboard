@@ -19,8 +19,8 @@ export default defineConfig({
         injectThemeColor: false,
       },
       manifest: {
-        name: "sing-box dashboard",
-        short_name: "sing-box",
+        name: "Home Gateway",
+        short_name: "Home Gateway",
         description: "Web dashboard for sing-box.",
         id: "./",
         start_url: "./",

@@ -1,6 +1,7 @@
 import { Code } from "@connectrpc/connect";
 import { memo, useMemo, useState } from "react";
 
+import { sourceAddressMatches } from "../api/gateway";
 import type { ConnectionRow } from "../api/daemon";
 import { formatBytes, formatClockTime, formatDateTime, formatDurationMs } from "../api/format";
 import { useStream } from "../api/stream";
@@ -39,14 +40,14 @@ const SORT_OPTIONS: { value: ConnectionSortMode; label: MessageKey }[] = [
   { value: "trafficTotal", label: "By traffic total" },
 ];
 
-export function ConnectionsView() {
+export function ConnectionsView({ source = "" }: { source?: string }) {
   const api = useApi();
   const { t } = useI18n();
   const connections = useStream(api.connections);
   const isMobile = useIsMobile();
   const [stateFilter, setStateFilter] = useState<ConnectionStateFilter>(loadConnectionStateFilter);
   const [sortMode, setSortMode] = useState<ConnectionSortMode>(loadConnectionSortMode);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(source ? `source.ip:${source}` : "");
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -207,6 +208,9 @@ function matchesSearch(row: ConnectionRow, search: string): boolean {
           break;
         case "inbound.type":
           matched = connection.inboundType.toLowerCase().includes(value);
+          break;
+        case "source.ip":
+          matched = sourceAddressMatches(connection.source.toLowerCase(), value);
           break;
         case "source":
           matched = connection.source.toLowerCase().includes(value);

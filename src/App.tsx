@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactN
 import {
   loadServersState,
   saveServersState,
+  serverConnectUrl,
   serverDisplayName,
   type Server,
   type ServersState,
@@ -59,6 +60,7 @@ import {
   CrashReportFileView,
   CrashReportListView,
 } from "./views/CrashReportsView";
+import { GatewayView } from "./views/GatewayView";
 import { GroupsView } from "./views/GroupsView";
 import { LogsView } from "./views/LogsView";
 import {
@@ -110,7 +112,8 @@ import { cx } from "./lib/cx";
 export type Route =
   | { page: "overview" }
   | { page: "groups" }
-  | { page: "connections" }
+  | { page: "gateway" }
+  | { page: "connections"; source: string }
   | { page: "logs" }
   | { page: "tools" }
   | { page: "tools/network-quality" }
@@ -165,8 +168,10 @@ function routeFromHash(locationHash: string): Route {
       return { page: "overview" };
     case "groups":
       return { page: "groups" };
+    case "gateway":
+      return { page: "gateway" };
     case "connections":
-      return { page: "connections" };
+      return { page: "connections", source: query.get("source") || "" };
     case "logs":
       return { page: "logs" };
     case "tools":
@@ -308,6 +313,8 @@ function routeTitle(route: Route, t: Translate, language: string): string {
       return t("Dashboard");
     case "groups":
       return t("Groups");
+    case "gateway":
+      return t("Gateway");
     case "connections":
       return t("Connections");
     case "logs":
@@ -472,10 +479,14 @@ function WebApp() {
     state.serversState.servers.find((server) => server.id === state.serversState.activeId) ?? null;
 
   useEffect(() => {
-    if (!activeServer && location.hash !== "") {
+    if (!activeServer && state.route.page !== "gateway" && location.hash !== "") {
       history.replaceState(null, "", location.pathname + location.search);
     }
-  }, [activeServer]);
+  }, [activeServer, state.route.page]);
+
+  if (!activeServer && state.route.page === "gateway") {
+    return <GatewayView connectionsAvailable={false} standalone />;
+  }
 
   if (!activeServer) {
     return (
@@ -787,7 +798,8 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
     }
   }, [known, started, groupsKnown, hasGroups, route, capabilities, localHost]);
 
-  if (lostError !== null && host === null) {
+  const gatewayOpen = host === null && route.page === "gateway";
+  if (lostError !== null && host === null && !gatewayOpen) {
     return (
       <ConnectionErrorView
         server={props.server}
@@ -800,7 +812,7 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
     );
   }
 
-  if (serviceStatus.data.status === null) {
+  if (serviceStatus.data.status === null && !gatewayOpen) {
     if (host !== null) {
       return (
         <div className={styles.desktopConnectingView}>
@@ -852,6 +864,7 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
 
   const mainPages = (
     <>
+      {host === null && navItem("gateway", t("Gateway"), "dns", route.page === "gateway")}
       {navItem("logs", t("Logs"), "text_snippet", route.page === "logs")}
       {navItem(
         "tools",
@@ -868,7 +881,8 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
     <main className={styles.content}>
       {route.page === "overview" && <OverviewView />}
       {route.page === "groups" && <GroupsView />}
-      {route.page === "connections" && <ConnectionsView />}
+      {route.page === "gateway" && <GatewayView connectionsAvailable={started && URL.canParse(serverConnectUrl(props.server.url)) && new URL(serverConnectUrl(props.server.url)).hostname === location.hostname} />}
+      {route.page === "connections" && <ConnectionsView key={route.source} source={route.source} />}
       {route.page === "logs" && <LogsView />}
       {route.page === "tools" && <ToolsView />}
       {route.page === "tools/network-quality" && <NetworkQualityView />}
@@ -942,7 +956,7 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
             >
               <Icon name={menuOpen ? "close" : "menu"} size={18} />
             </IconButton>
-            <div className={styles.mobileTopbarBrand}>sing-box</div>
+            <div className={styles.mobileTopbarBrand}>Home Gateway</div>
           </header>
         )}
         {menuOpen && (
@@ -957,7 +971,7 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
           <nav className={styles.sidebar}>
             <div className={styles.sidebarTitlebar} />
             <div className={styles.sidebarBrand}>
-              sing-box
+              Home Gateway
               {serverInfo && <span className={styles.sidebarBrandVersion}>{serverInfo.version}</span>}
             </div>
             {started ? (
@@ -974,7 +988,7 @@ function ShellContent(props: ShellProps & { onRetry: () => void }) {
         ) : (
           <nav className={cx(styles.sidebar, menuOpen && styles.open)}>
             <div className={styles.sidebarBrand}>
-              sing-box
+              Home Gateway
               {serverInfo && <span className={styles.sidebarBrandVersion}>{serverInfo.version}</span>}
             </div>
             {navItem("overview", t("Overview"), "dashboard", route.page === "overview")}

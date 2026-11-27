@@ -57,6 +57,7 @@ export function ConnectionErrorView(props: {
             {props.reconnecting && <Spinner />}
             {props.reconnecting ? t("Reconnecting...") : t("Retry")}
           </Button>
+          <Button href="#/gateway">{t("Gateway")}</Button>
           <Button onClick={() => setEditing(true)}>
             {t("Edit Server")}
           </Button>

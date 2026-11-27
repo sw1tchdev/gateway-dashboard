@@ -174,6 +174,7 @@ export function SetupView(props: {
             {connecting ? t("Connecting...") : t("Connect")}
           </Button>
         </form>
+        <Button href="#/gateway">{t("Gateway")}</Button>
         <div className={styles.setupFooter}>
           <div className="settings-row">
             <span className="settings-row-label">{t("Appearance")}</span>

@@ -79,11 +79,11 @@ export function Spinner(props: { className?: string }) {
 }
 
 export function Brand(props: { className?: string; product?: string | null }) {
-  const product = props.product === undefined ? "dashboard" : props.product;
+  const product = props.product;
   return (
     <div className={cx("setup-brand", props.className)}>
-      sing-box
-      {product !== null && <small>{product}</small>}
+      Home Gateway
+      {product != null && <small>{product}</small>}
     </div>
   );
 }
