@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
-import { changedConfigPaths, GatewayUnauthorized, gatewayRequest, sourceAddressMatches } from "./gateway";
+import { changedConfigPaths, GatewayUnauthorized, gatewayRequest, metaCubeXDLink, sourceAddressMatches } from "./gateway";
 
 describe("gateway", () => {
+  it("shows the optional MetaCubeXD link only for the gateway host without credentials or URL parameters", () => {
+    const hostname = "gateway.test";
+    expect(metaCubeXDLink("https://gateway.test:9444/ui/", hostname)).toBe("https://gateway.test:9444/ui/");
+    for (const value of [undefined, "/ui/", "javascript:void(0)", "http://gateway.test:9444/ui/",
+      "https://gateway.test.other.test/ui/", "https://user:pass@gateway.test/ui/",
+      "https://gateway.test/ui/?token=fixture", "https://gateway.test/ui/#token=fixture"]) {
+      expect(metaCubeXDLink(value, hostname)).toBeUndefined();
+    }
+  });
+
   it("never mixes an address prefix match with another device", () => {
     expect(sourceAddressMatches("192.0.2.20:4500", "192.0.2.2")).toBe(false);
     expect(sourceAddressMatches("192.0.2.2:4500", "192.0.2.2")).toBe(true);

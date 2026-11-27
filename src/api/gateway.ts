@@ -29,7 +29,15 @@ export interface GatewayStatus {
   config_revision: string;
   last_result: string;
   device_registry?: boolean;
+  metacubexd_url?: string;
   devices: GatewayDevice[];
+}
+
+export function metaCubeXDLink(value: string | undefined, hostname: string): string | undefined {
+  if (!value || !URL.canParse(value)) return;
+  const url = new URL(value);
+  if (url.protocol === "https:" && url.hostname === hostname && !url.username && !url.password && !url.search && !url.hash)
+    return url.href;
 }
 
 export interface GatewayConfig {

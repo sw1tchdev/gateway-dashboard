@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { changedConfigPaths, GatewayUnauthorized, gatewayRequest, type DeviceDetails, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
+import { changedConfigPaths, GatewayUnauthorized, gatewayRequest, metaCubeXDLink, type DeviceDetails, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
 import { readGatewaySession, saveGatewaySession } from "../api/gatewaySession";
 import { navigate, useNavigationGuard } from "../app/context";
 import { useI18n } from "../app/i18n";
 import { createGatewayEditor } from "../api/gatewayEditor";
 import { PageHeader } from "../components/PageHeader";
+import { Icon } from "../components/Icon";
 import { Button, Card } from "../components/ui";
 import { GatewayDevices, deviceEditorDirty, type DeviceEditor } from "./GatewayDevices";
 
@@ -120,9 +121,13 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
     });
   }
 
+  const metaCubeXD = status?.metacubexd_url && metaCubeXDLink(status.metacubexd_url, location.hostname);
   return (
     <div className="page">
-      <PageHeader title={t("Gateway")} back={standalone ? { label: t("Dashboard"), onClick: () => navigate("overview") } : undefined} />
+      <PageHeader title={t("Gateway")} back={standalone ? { label: t("Dashboard"), onClick: () => navigate("overview") } : undefined}
+        actions={metaCubeXD ? <Button size="small" href={metaCubeXD} target="_blank" rel="noopener noreferrer">
+          MetaCubeXD <Icon name="open_in_new" size={16} />
+        </Button> : undefined} />
       {error && <p className="banner error" role="alert">{error}</p>}
       {status === null ? (
         <Card title={t("Gateway administration")} icon="dns">
