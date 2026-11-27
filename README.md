@@ -2,7 +2,7 @@
 
 Home Gateway is an independent dashboard for a local sing-box gateway. It is based on [SagerNet/sing-box-dashboard](https://github.com/SagerNet/sing-box-dashboard) at commit `3e4bf08e5bf5b9417cf9c36e5a2d5abcb21bdd34`. The Gateway API integration targets sing-box 1.14.5.
 
-Open **Gateway** to authenticate with the management service on the dashboard origin at `/api/gateway/`. The administrator credential stays in tab memory. The device card shows the confirmed route and links to the selected native server's tracked connections when it is on the same host. New game connections that bypass sing-box are outside this stream.
+Open **Gateway** to authenticate with the management service on the dashboard origin at `/api/gateway/`. The administrator credential stays in tab memory. Register each device by LAN IPv4 address or by MAC address, give it a name and an optional label, then choose its route. New entries use the normal sing-box rules. An IP rule follows the address when DHCP reassigns it. A MAC rule follows the address seen on the gateway's LAN. Each card shows the confirmed route and links to tracked connections when its IP and the matching native server are available. Connections that bypass sing-box are outside this stream.
 
 To edit a configuration, load the editable sections, make changes, and validate them. Review the diff of server-masked values before applying and restarting. The server preserves masked credentials when their placeholders are left intact. Restart and restore actions are available on the Gateway page even if the native API is temporarily down. The management service and reverse proxy must be running.
 

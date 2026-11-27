@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { changedConfigPaths, gatewayRequest, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
+import { changedConfigPaths, gatewayRequest, type DeviceDetails, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
 import { navigate, useNavigationGuard } from "../app/context";
 import { useI18n } from "../app/i18n";
+import { createGatewayEditor } from "../api/gatewayEditor";
 import { PageHeader } from "../components/PageHeader";
-import { Button, Card, DataLine } from "../components/ui";
+import { Button, Card } from "../components/ui";
+import { GatewayDevices, deviceEditorDirty, type DeviceEditor } from "./GatewayDevices";
 
 let sessionAdmin = "";
 type Result = { ok: boolean; status: GatewayStatus; preview?: string };
@@ -11,14 +13,17 @@ type Result = { ok: boolean; status: GatewayStatus; preview?: string };
 export function GatewayView({ connectionsAvailable, standalone = false }: { connectionsAvailable: boolean; standalone?: boolean }) {
   const { t } = useI18n();
   const [status, setStatus] = useState<GatewayStatus | null>(null);
-  const [config, setConfig] = useState<GatewayConfig | null>(null);
+  const [config, setConfig] = useState<(GatewayConfig & ReturnType<typeof createGatewayEditor> & { original: string }) | null>(null);
   const [draft, setDraft] = useState("");
-  const [checked, setChecked] = useState<string[] | null>(null);
+  const [checked, setChecked] = useState<{ text: string; paths: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const pending = useRef(false);
+  const [deviceForm, setDeviceForm] = useState<DeviceEditor | null>(null);
+  const configDirty = config !== null && draft !== config.text;
+  const dirty = configDirty || deviceEditorDirty(deviceForm);
 
-  useNavigationGuard(config !== null && draft !== config.text, (proceed) => {
+  useNavigationGuard(dirty, (proceed) => {
     if (window.confirm(t("Discard gateway changes?"))) proceed();
   });
 
@@ -62,31 +67,32 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
 
   async function loadConfig() {
     const value = await gatewayRequest<GatewayConfig>("config", sessionAdmin);
-    setConfig(value);
-    setDraft(value.text);
+    const editor = createGatewayEditor(value.text, t("Hidden value"));
+    setConfig({ revision: value.revision, original: value.text, ...editor });
+    setDraft(editor.text);
     setChecked(null);
   }
 
-  async function mutation(action: "config/apply" | "restart" | "rollback" | `devices/${string}`,
-    payload: { revision: string; text?: string; mode?: DeviceMode }, needsRestart = true) {
+  async function mutation(action: "config/apply" | "restart" | "rollback" | "devices" | `devices/${string}`,
+    payload: { revision: string; text?: string; mode?: DeviceMode } & Partial<DeviceDetails>, needsRestart = true,
+    method?: "PUT" | "POST" | "DELETE") {
     if (needsRestart && !window.confirm(t("This operation restarts the gateway service. Continue?"))) return;
     await perform(async () => {
       setChecked(null);
       let result: Result;
       try {
-        result = await gatewayRequest<Result>(action, sessionAdmin, payload, action.startsWith("devices/") ? "PUT" : "POST");
+        result = await gatewayRequest<Result>(action, sessionAdmin, payload, method ?? (action.startsWith("devices/") ? "PUT" : "POST"));
       } catch (failure) {
         const actual = await gatewayRequest<GatewayStatus>("status", sessionAdmin).catch(() => null);
-        setStatus(actual);
+        if (actual) setStatus(actual);
         throw failure;
       }
       setStatus(result.status);
-      if (config && (action === "config/apply" || action === "rollback")) await loadConfig();
+      if (method) setDeviceForm(null);
+      if (config && (action === "config/apply" || action === "rollback" ||
+        (!configDirty && config.revision !== result.status.config_revision))) await loadConfig();
     });
   }
-
-  const modeLabel = (mode: string) => mode === "rules" ? t("Use gateway rules")
-    : mode === "direct" ? t("Bypass sing-box") : t("Unknown");
 
   return (
     <div className="page">
@@ -103,35 +109,16 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
         </Card>
       ) : (
         <>
-          {status.devices.map((device) => (
-            <Card key={device.id} title={device.name} icon="dns">
-              <DataLine label={t("IP address")} value={device.ip ?? "—"} mono />
-              <DataLine label={t("Effective route")} value={modeLabel(device.effective_mode)} />
-              {device.desired_mode !== device.effective_mode &&
-                <DataLine label={t("Requested route")} value={modeLabel(device.desired_mode)} />}
-              <p className="hint">{t("Bypassed game connections are outside the sing-box tracker.")}</p>
-              {device.apply_method === "unavailable" && <p className="banner error" role="alert">{t("Device routing is unavailable. Check the gateway status before switching.")}</p>}
-              {device.apply_method === "restart" && <p className="hint">{t("Changing this route requires a service restart.")}</p>}
-              <div className="row-actions">
-                {(["rules", "direct"] as const).map((mode) => (
-                  <Button key={mode} variant={device.effective_mode === mode ? "primary" : undefined}
-                    disabled={busy || device.apply_method === "unavailable" || device.effective_mode === mode || (config !== null && draft !== config.text)}
-                    onClick={() => void mutation(`devices/${encodeURIComponent(device.id)}`,
-                      { mode, revision: status.config_revision }, device.apply_method === "restart")}>
-                    {modeLabel(mode)}
-                  </Button>
-                ))}
-                {device.ip && connectionsAvailable && <Button onClick={() => navigate(`connections?source=${encodeURIComponent(device.ip!)}`)}>
-                  {t("Show connections")}
-                </Button>}
-              </div>
-            </Card>
-          ))}
-          {!status.devices.length && <p className="hint">{t("No devices are registered with this gateway.")}</p>}
+          <GatewayDevices status={status} editor={deviceForm} setEditor={setDeviceForm} busy={busy}
+            configDirty={configDirty} connectionsAvailable={connectionsAvailable}
+            onMode={(device, mode) => void mutation(`devices/${encodeURIComponent(device.id)}`,
+              { mode, revision: status.config_revision }, device.apply_method === "restart")}
+            onWrite={(path, method, fields) => void mutation(path, { ...fields, revision: status.config_revision }, false, method)} />
           <Card title={t("Configuration")} icon="settings" actions={
             <Button size="small" disabled={busy} onClick={() => {
-              if (config && draft !== config.text && !window.confirm(t("Discard gateway changes?"))) return;
+              if (dirty && !window.confirm(t("Discard gateway changes?"))) return;
               sessionAdmin = "";
+              setDeviceForm(null);
               setStatus(null); setConfig(null); setDraft(""); setChecked(null); setError("");
             }}>{t("Sign out of gateway")}</Button>
           }>
@@ -148,23 +135,22 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
             </div>
             {config !== null && (
               <>
+                <p className="hint" id="gateway-config-secrets">{t("Leave hidden values in place to keep them. To change one, replace its entire placeholder.")}</p>
                 <label className="field">{t("Editable configuration sections")}
-                  <textarea rows={16} spellCheck={false} className="input mono" style={{ height: "auto", resize: "vertical" }} value={draft} disabled={busy}
+                  <textarea rows={16} spellCheck={false} aria-describedby="gateway-config-secrets" className="input mono" style={{ height: "auto", resize: "vertical" }} value={draft} disabled={busy}
                     onChange={(event) => { setDraft(event.target.value); setChecked(null); }} />
                 </label>
                 <div className="row-actions">
                   <Button disabled={busy} onClick={() => void perform(async () => {
                     setChecked(null);
-                    const result = await gatewayRequest<Result>("config/check", sessionAdmin, { revision: config.revision, text: draft });
+                    const text = config.restore(draft, t("Unknown hidden value. Reload the configuration to restore its saved values."));
+                    const result = await gatewayRequest<Result>("config/check", sessionAdmin, { revision: config.revision, text });
                     setStatus(result.status);
-                    if (typeof result.preview === "string") {
-                      setChecked(changedConfigPaths(JSON.parse(config.text), JSON.parse(result.preview), true));
-                    } else {
-                      setChecked(changedConfigPaths(JSON.parse(config.text), JSON.parse(draft)));
-                    }
+                    const masked = typeof result.preview === "string";
+                    setChecked({ text, paths: changedConfigPaths(JSON.parse(config.original), JSON.parse(result.preview ?? text), masked) });
                   })}>{t("Validate configuration")}</Button>
-                  <Button variant="primary" disabled={busy || !checked?.length || config.revision !== status.config_revision}
-                    onClick={() => void mutation("config/apply", { revision: config.revision, text: draft })}>
+                  <Button variant="primary" disabled={busy || !checked?.paths.length || config.revision !== status.config_revision}
+                    onClick={() => checked && void mutation("config/apply", { revision: config.revision, text: checked.text })}>
                     {t("Apply and restart")}
                   </Button>
                   {draft !== config.text && <Button disabled={busy} onClick={() => {
@@ -173,7 +159,7 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
                 </div>
                 {checked !== null && <div role="status">
                   <p>{t("Configuration validated")}</p>
-                  {checked.length > 0 && <pre>{checked.join("\n")}</pre>}
+                  {checked.paths.length > 0 && <pre>{checked.paths.join("\n")}</pre>}
                 </div>}
               </>
             )}

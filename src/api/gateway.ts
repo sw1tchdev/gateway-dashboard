@@ -1,18 +1,35 @@
 export type DeviceMode = "rules" | "direct";
+export type DeviceMatch = "ip" | "mac" | "ip_mac";
+
+export interface DeviceDetails {
+  name: string;
+  label: string;
+  address: string;
+  match_type: DeviceMatch;
+}
+
+export interface GatewayDevice {
+  id: string;
+  name: string;
+  mac?: string | null;
+  ip: string | null;
+  label?: string;
+  address?: string;
+  match_type?: DeviceMatch;
+  legacy?: boolean;
+  conflict?: boolean;
+  conflict_with?: string[];
+  desired_mode: DeviceMode | "unknown";
+  effective_mode: DeviceMode | "unknown";
+  apply_method: "restart" | "nft" | "unavailable";
+}
 
 export interface GatewayStatus {
   configured: boolean;
   config_revision: string;
   last_result: string;
-  devices: {
-    id: string;
-    name: string;
-    mac: string;
-    ip: string | null;
-    desired_mode: DeviceMode | "unknown";
-    effective_mode: DeviceMode | "unknown";
-    apply_method: "restart" | "nft" | "unavailable";
-  }[];
+  device_registry?: boolean;
+  devices: GatewayDevice[];
 }
 
 export interface GatewayConfig {
@@ -53,11 +70,11 @@ export function changedConfigPaths(before: unknown, after: unknown, masked = fal
   return changes;
 }
 
-type GatewayPath = "status" | "config" | "config/check" | "config/apply" | "restart" | "rollback" | `devices/${string}`;
+type GatewayPath = "status" | "config" | "config/check" | "config/apply" | "restart" | "rollback" | "devices" | `devices/${string}`;
 
 export async function gatewayRequest<T>(
   path: GatewayPath, token: string, data?: unknown,
-  method: "GET" | "POST" | "PUT" = data === undefined ? "GET" : "POST", fetcher = fetch,
+  method: "GET" | "POST" | "PUT" | "DELETE" = data === undefined ? "GET" : "POST", fetcher = fetch,
 ): Promise<T> {
   const response = await fetcher(`/api/gateway/${path}`, {
     method,
