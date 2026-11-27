@@ -35,6 +35,15 @@ describe("gateway device registry", () => {
     expect(page).not.toContain("The saved device changed.");
   });
 
+  it("identifies the IP shown on a MAC rule as the current address observed on the LAN", () => {
+    const macRule = { ...device, match_type: "mac" as const, legacy: false };
+    const page = html({ ...status, devices: [macRule] });
+    expect(page).toContain("Current IPv4 on the LAN");
+    expect(page).toContain(macRule.ip);
+    expect(page).not.toContain("IP and MAC addresses");
+    expect(html({ ...status, devices: [{ ...macRule, ip: null }] })).not.toContain("Current IPv4 on the LAN");
+  });
+
   it("keeps a draft and flags a concurrent change to the same device", () => {
     const view = { ...status, devices: [{ ...device, name: "Updated elsewhere" }] };
     const page = html(view, { id: device.id, original: details, fields: { ...details, label: "Local draft" } });

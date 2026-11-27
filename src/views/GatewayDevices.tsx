@@ -128,7 +128,8 @@ export function GatewayDevices({ status, editor, setEditor, busy, configDirty, c
           value={`${device.ip ?? "—"} · ${device.mac ?? device.address ?? "—"}`} mono />}
         {device.match_type === "mac" && <DataLine label={t("MAC address")} value={device.address ?? device.mac ?? "—"} mono />}
         {device.match_type !== "ip_mac" && (device.match_type !== "mac" || device.ip) &&
-          <DataLine label={t("IP address")} value={device.ip ?? device.address ?? "—"} mono />}
+          <DataLine label={device.match_type === "mac" ? t("Current IPv4 on the LAN") : t("IP address")}
+            value={device.ip ?? device.address ?? "—"} mono />}
         <DataLine label={t("Effective route")} value={modeLabel(device.effective_mode)} />
         {device.desired_mode !== device.effective_mode &&
           <DataLine label={t("Requested route")} value={modeLabel(device.desired_mode)} />}

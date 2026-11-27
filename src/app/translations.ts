@@ -12,6 +12,7 @@ export const LANGUAGES: { value: Language; label: string }[] = [
 ];
 
 export const TRANSLATIONS = {
+  "Current IPv4 on the LAN": {"zh-Hans": "当前局域网 IPv4 地址", "zh-Hant": "目前區域網路 IPv4 位址", "fa": "آدرس IPv4 فعلی در شبکهٔ محلی", "ru": "Текущий IPv4 в локальной сети"},
   "Hidden value": {"zh-Hans": "已隐藏", "zh-Hant": "已隱藏", "fa": "مقدار پنهان", "ru": "Скрыто"},
   "Leave hidden values in place to keep them. To change one, replace its entire placeholder.": {"zh-Hans": "保留占位符即可保留网关中的原值。要更改原值，请替换整个占位符。", "zh-Hant": "保留預留位置即可保留閘道中的原值。若要變更，請替換整個預留位置。", "fa": "برای حفظ مقادیر پنهان، نشانگرها را دست نزنید. برای تغییر مقدار، کل نشانگر آن را جایگزین کنید.", "ru": "Пароли, ключи и другие закрытые значения хранятся на шлюзе. Оставьте «⟦Скрыто #…⟧», чтобы сохранить значение, или замените подстановку целиком."},
   "Unknown hidden value. Reload the configuration to restore its saved values.": {"zh-Hans": "未知占位符。请重新加载配置以恢复已保存的值。", "zh-Hant": "未知預留位置。請重新載入設定以還原已儲存的值。", "fa": "نشانگر ناشناخته است. برای بازیابی مقادیر، پیکربندی را دوباره بارگیری کنید.", "ru": "Подстановка не распознана. Заново загрузите конфигурацию, чтобы восстановить сохранённые значения."},
@@ -34,6 +35,7 @@ export const TRANSLATIONS = {
   "Gateway administration": {"zh-Hans": "网关管理", "zh-Hant": "閘道管理", "fa": "مدیریت دروازه", "ru": "Управление шлюзом"},
   "Gateway admin token": {"zh-Hans": "网关管理员令牌", "zh-Hant": "閘道管理員權杖", "fa": "توکن مدیر دروازه", "ru": "Токен администратора шлюза"},
   "Gateway request failed": {"zh-Hans": "网关请求失败", "zh-Hant": "閘道請求失敗", "fa": "درخواست دروازه ناموفق بود", "ru": "Не удалось выполнить запрос к шлюзу"},
+  "The gateway rejected the administrator token. Sign in again.": {"zh-Hans": "网关拒绝了管理员令牌。请重新登录。", "zh-Hant": "閘道拒絕了管理員權杖。請重新登入。", "fa": "دروازه توکن مدیر را نپذیرفت. دوباره وارد شوید.", "ru": "Шлюз отклонил токен администратора. Войдите снова."},
   "Discard gateway changes?": {"zh-Hans": "放弃网关更改？", "zh-Hant": "捨棄閘道變更？", "fa": "تغییرات دروازه نادیده گرفته شود؟", "ru": "Отменить изменения конфигурации шлюза?"},
   "This operation restarts the gateway service. Continue?": {"zh-Hans": "此操作会重启网关服务。继续？", "zh-Hant": "此操作會重新啟動閘道服務。繼續？", "fa": "این عملیات سرویس دروازه را دوباره راه‌اندازی می‌کند. ادامه می‌دهید؟", "ru": "Операция перезапустит службу шлюза. Продолжить?"},
   "Use gateway rules": {"zh-Hans": "使用网关规则", "zh-Hant": "使用閘道規則", "fa": "استفاده از قوانین دروازه", "ru": "По правилам sing-box"},

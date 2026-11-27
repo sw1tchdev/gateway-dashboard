@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { changedConfigPaths, gatewayRequest, type DeviceDetails, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { changedConfigPaths, GatewayUnauthorized, gatewayRequest, type DeviceDetails, type DeviceMode, type GatewayConfig, type GatewayStatus } from "../api/gateway";
+import { readGatewaySession, saveGatewaySession } from "../api/gatewaySession";
 import { navigate, useNavigationGuard } from "../app/context";
 import { useI18n } from "../app/i18n";
 import { createGatewayEditor } from "../api/gatewayEditor";
@@ -7,16 +8,16 @@ import { PageHeader } from "../components/PageHeader";
 import { Button, Card } from "../components/ui";
 import { GatewayDevices, deviceEditorDirty, type DeviceEditor } from "./GatewayDevices";
 
-let sessionAdmin = "";
 type Result = { ok: boolean; status: GatewayStatus; preview?: string };
 
 export function GatewayView({ connectionsAvailable, standalone = false }: { connectionsAvailable: boolean; standalone?: boolean }) {
   const { t } = useI18n();
+  const [sessionAdmin, setSessionAdmin] = useState(readGatewaySession);
   const [status, setStatus] = useState<GatewayStatus | null>(null);
   const [config, setConfig] = useState<(GatewayConfig & ReturnType<typeof createGatewayEditor> & { original: string }) | null>(null);
   const [draft, setDraft] = useState("");
   const [checked, setChecked] = useState<{ text: string; paths: string[] } | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(Boolean(sessionAdmin));
   const [error, setError] = useState("");
   const pending = useRef(false);
   const [deviceForm, setDeviceForm] = useState<DeviceEditor | null>(null);
@@ -27,16 +28,28 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
     if (window.confirm(t("Discard gateway changes?"))) proceed();
   });
 
-  useEffect(() => {
-    let active = true;
-    if (sessionAdmin) {
-      gatewayRequest<GatewayStatus>("status", sessionAdmin).then(
-        (value) => { if (active) setStatus(value); },
-        (failure) => { if (active) setError(String(failure)); },
-      );
+  const handleFailure = useCallback((failure: unknown, attemptedToken: string) => {
+    if (failure instanceof GatewayUnauthorized) {
+      if (readGatewaySession() === attemptedToken) saveGatewaySession("");
+      if (!readGatewaySession()) {
+        setSessionAdmin(""); setStatus(null); setChecked(null);
+      }
+      setError(t("The gateway rejected the administrator token. Sign in again."));
+    } else {
+      setError(failure instanceof Error ? failure.message : t("Gateway request failed"));
     }
+  }, [t]);
+
+  useEffect(() => {
+    if (!sessionAdmin || status !== null) return;
+    let active = true;
+    setBusy(true);
+    gatewayRequest<GatewayStatus>("status", sessionAdmin).then(
+      value => { if (active) { setBusy(false); setError(""); setStatus(value); } },
+      failure => { if (active) { setBusy(false); handleFailure(failure, sessionAdmin); } },
+    );
     return () => { active = false; };
-  }, []);
+  }, [sessionAdmin, status, handleFailure]);
 
   async function perform(action: () => Promise<void>) {
     if (pending.current) return;
@@ -46,7 +59,7 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
     try {
       await action();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : t("Gateway request failed"));
+      handleFailure(failure, sessionAdmin);
     } finally {
       pending.current = false;
       setBusy(false);
@@ -59,10 +72,21 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
     const token = String(new FormData(form).get("admin") ?? "").trim();
     await perform(async () => {
       const next = await gatewayRequest<GatewayStatus>("status", token);
-      sessionAdmin = token;
+      saveGatewaySession(token);
+      setSessionAdmin(token);
       form.reset();
       setStatus(next);
     });
+  }
+
+  function signOut() {
+    if (dirty && !window.confirm(t("Discard gateway changes?"))) return;
+    saveGatewaySession(""); setSessionAdmin("");
+    setDeviceForm(null); setStatus(null); setConfig(null); setDraft(""); setChecked(null); setError("");
+  }
+
+  function refreshStatus() {
+    return perform(async () => setStatus(await gatewayRequest<GatewayStatus>("status", sessionAdmin)));
   }
 
   async function loadConfig() {
@@ -83,8 +107,10 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
       try {
         result = await gatewayRequest<Result>(action, sessionAdmin, payload, method ?? (action.startsWith("devices/") ? "PUT" : "POST"));
       } catch (failure) {
-        const actual = await gatewayRequest<GatewayStatus>("status", sessionAdmin).catch(() => null);
-        if (actual) setStatus(actual);
+        if (!(failure instanceof GatewayUnauthorized)) {
+          try { setStatus(await gatewayRequest<GatewayStatus>("status", sessionAdmin)); }
+          catch (refreshFailure) { if (refreshFailure instanceof GatewayUnauthorized) throw refreshFailure; }
+        }
         throw failure;
       }
       setStatus(result.status);
@@ -100,12 +126,18 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
       {error && <p className="banner error" role="alert">{error}</p>}
       {status === null ? (
         <Card title={t("Gateway administration")} icon="dns">
-          <form onSubmit={signIn}>
+          {sessionAdmin ? <>
+            {busy && <p role="status">{t("Connecting...")}</p>}
+            <div className="row-actions">
+              <Button disabled={busy} onClick={() => void refreshStatus()}>{t("Retry")}</Button>
+              <Button disabled={busy} onClick={signOut}>{t("Sign out of gateway")}</Button>
+            </div>
+          </> : <form onSubmit={signIn}>
             <label className="field">{t("Gateway admin token")}
               <input name="admin" type="password" className="input" required autoComplete="off" />
             </label>
             <div className="row-actions"><Button type="submit" disabled={busy}>{t("Connect")}</Button></div>
-          </form>
+          </form>}
         </Card>
       ) : (
         <>
@@ -115,17 +147,11 @@ export function GatewayView({ connectionsAvailable, standalone = false }: { conn
               { mode, revision: status.config_revision }, device.apply_method === "restart")}
             onWrite={(path, method, fields) => void mutation(path, { ...fields, revision: status.config_revision }, false, method)} />
           <Card title={t("Configuration")} icon="settings" actions={
-            <Button size="small" disabled={busy} onClick={() => {
-              if (dirty && !window.confirm(t("Discard gateway changes?"))) return;
-              sessionAdmin = "";
-              setDeviceForm(null);
-              setStatus(null); setConfig(null); setDraft(""); setChecked(null); setError("");
-            }}>{t("Sign out of gateway")}</Button>
+            <Button size="small" disabled={busy} onClick={signOut}>{t("Sign out of gateway")}</Button>
           }>
             <p className="hint" role="status">{status.last_result}</p>
             <div className="row-actions">
-              <Button disabled={busy} onClick={() => void perform(async () =>
-                setStatus(await gatewayRequest<GatewayStatus>("status", sessionAdmin)))}>{t("Refresh")}</Button>
+              <Button disabled={busy} onClick={() => void refreshStatus()}>{t("Refresh")}</Button>
               <Button disabled={busy || (config !== null && draft !== config.text)}
                 onClick={() => void perform(loadConfig)}>{t("Load configuration")}</Button>
               <Button disabled={busy || (config !== null && draft !== config.text)}

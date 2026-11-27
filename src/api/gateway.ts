@@ -72,10 +72,15 @@ export function changedConfigPaths(before: unknown, after: unknown, masked = fal
 
 type GatewayPath = "status" | "config" | "config/check" | "config/apply" | "restart" | "rollback" | "devices" | `devices/${string}`;
 
+export class GatewayUnauthorized extends Error {
+  constructor() { super("The gateway rejected the administrator token. Sign in again."); }
+}
+
 export async function gatewayRequest<T>(
   path: GatewayPath, token: string, data?: unknown,
   method: "GET" | "POST" | "PUT" | "DELETE" = data === undefined ? "GET" : "POST", fetcher = fetch,
 ): Promise<T> {
+  if (!/^[!-~]+$/.test(token)) throw new GatewayUnauthorized();
   const response = await fetcher(`/api/gateway/${path}`, {
     method,
     mode: "same-origin",
@@ -88,10 +93,12 @@ export async function gatewayRequest<T>(
     },
     body: data === undefined ? undefined : JSON.stringify(data),
   });
+  if (response.status === 401) throw new GatewayUnauthorized();
   if (!response.headers.get("content-type")?.includes("application/json")) {
     throw new Error(`Gateway HTTP ${response.status} (JSON)`);
   }
   const payload = await response.json().catch(() => { throw new Error(`Gateway HTTP ${response.status} (JSON)`); });
-  if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : `Gateway HTTP ${response.status}`);
+  if (!response.ok) throw new Error(typeof payload?.error === "string" && !payload.error.includes(token)
+    ? payload.error : `Gateway HTTP ${response.status}`);
   return payload as T;
 }
